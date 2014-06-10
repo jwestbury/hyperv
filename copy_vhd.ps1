@@ -1,8 +1,10 @@
+# todo - update script to use parameters instead of hard-coded variables
+
 ﻿param(
     [Alias('f')]
     [switch]$force,
     [Alias('p')]
-    $path = "\\poseidon\server",
+    $path = "\\path\to\server",
     [Alias('vm')]
     $vmList
 )
@@ -21,9 +23,6 @@ write-host " ";
 write-host "Included VMs: $vmList";
 write-host " ";
 write-host "`$vmList object type is ";
-
-# testing
-$vmList = ("nagios")
 
 foreach ($element in $vmList) {
     Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2000 -Message "Backup job started for $($element)";
