@@ -1,0 +1,81 @@
+CONFIGURING YOUR NAGIOS OBJECT DEFINITIONS
+
+In order to configure Nagios to correctly monitor VMs using data only available
+from the Hyper-V host machine, you will need to use custom object definitions.
+
+In your Nagios host defintions, for a given VM, you will want to configure two
+custom object definitions, _HVHOSTNAME and _HVVMNAME. It should look like this:
+
+    define host{
+            use             windows-server  ; Inherit default values from a template
+            host_name       vmtest          ; The name we're giving to this host
+            alias           VM Test         ; A longer name associated with the host
+            address         10.1.2.3        ; IP address of the host
+            notification_options    d,r
+            _HVHOSTNAME     Merlin          ; The host the VM resides on
+            _HVVMNAME       vmtest          ; The name of the virtual machine
+            }
+
+If your virtual machines use identical hostnames to VM names (as the VM name is
+configured within Hyper-V), you will not need to use the _HVVMNAME object
+definition. This object definition exists for scenarios in which a hostname may
+differ from the VM name which is configured within Hyper-V.
+
+Now, in your Nagios command definitions, add the following:
+
+    # 'check_hv_nrpe' command definition
+    define command{
+            command_name    check_hv_nrpe
+            command_line    $USER1$/check_nrpe -H $_HOSTHVHOSTNAME$ -c $ARG1$ -a
+                $_HOSTHVVMNAME $ARG2$ $ARG3$
+    }
+
+This will create a Nagios check, check_hv_nrpe, which utilizes the check_nrpe
+command, but points at the host on which a VM resides, rather than at the VM
+itself.
+
+CONFIGURING NSCLIENT++ AND CHECK_NRPE FOR CHECK_HVVHM.PS1
+
+NSClient++ has limitations in its support for multiple variables. As such, you
+will need to configure variables in a rather specific manner in your nsclient
+configuration file (typically nsclient.ini). In the wrapped scripts section of
+the nsclient configuration file, add the following:
+
+    ; CHECK HYPER-V VIRTUAL MACHINES
+    check_hvvm=check_hvvm.ps1 -vm $ARG1$ -mem $ARG2$ -net $ARG3$
+
+Make sure you have placed check_hvvm.ps1 in the scripts folder on your Hyper-V
+server. After this, restart NSClient++.
+
+It is recommended to create a hostgroup in Nagios which contains your Hyper-V
+virtual machines. In addition to this host group, you will want to create a
+service definition to utilize the check you have previously configured in
+NSClient++. You may use the following as a template:
+
+    # Define hostgroup for Hyper-V virtual machines
+    
+    define hostgroup{
+            hostgroup_name  hv-vms
+            alias           Hyper-V Virtual Machines
+            members         vmtest,vmtest2
+            }
+
+    # Services specific to Hyper-V VMs, not specific to Windows/Linux
+    
+    define service{
+            use                     windows-service
+            contact_groups          hv-admins
+            hostgroup_name          hv-vms
+            service_description     VM Memory Usage
+            check_command           check_hv_nrpe!check_hvvm!on!on
+            notification_options    w,c,r
+            }
+
+The order of the arguments in the check command is as follows:
+
+check_hv_nrpe - specify the command to look for in your Nagios config
+$ARG1$, check_hvvm - specify the command to use on the remote host
+$ARG2$, on - specify whether or not to check dynamic memory usage, can be set
+            to "off" if desired.
+$ARG3$, on - specify whether or not to check VM network adapters, can be set
+            to "off" if desired.
