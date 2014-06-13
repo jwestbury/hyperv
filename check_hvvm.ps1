@@ -15,18 +15,19 @@ $nagExitString = ""
 $memoryWarningThreshold = .85
 $memoryCriticalThreshold = .9
 
-Function Check-VmMemory {
+
+if($checkMemory -eq "on") {
     if ($vm.DynamicMemoryEnabled) {
         # determine percentage of max memory currently allocated to the VM
         $memoryPercentUsed = $vm.MemoryAssigned/$vm.MemoryMaximum
         if($memoryPercentUsed -le $memoryWarningThreshold) {
-            $nagExitString += "Memory usage out of maximum is" + ("{0:P0}" -f $memorypercentused) + ". "
+            $nagExitString += "Memory usage out of maximum is " + ("{0:P0}" -f $memorypercentused) + ". "
             $nagStates.Set_Item("vmMem", 0)
         } elseif ($memoryPercentUsed -le $memoryCriticalThreshold) {
-            $nagExitString += "Memory usage out of maximum is" + ("{0:P0}" -f $memorypercentused) + ". "
+            $nagExitString += "Memory usage out of maximum is " + ("{0:P0}" -f $memorypercentused) + ". "
             $nagStates.Set_Item("vmMem", 1)
         } else {
-            $nagExitString += "Memory usage out of maximum is" + ("{0:P0}" -f $memorypercentused) + ". "
+            $nagExitString += "Memory usage out of maximum is " + ("{0:P0}" -f $memorypercentused) + ". "
             $nagStates.Set_Item("vmMem", 2)
         }
     } else {
@@ -36,7 +37,7 @@ Function Check-VmMemory {
     }
 }
 
-Function Check-VmNetwork {
+if($checkNet -eq "on") {
     $netNotOkay = $False
     $vm | Get-VMNetworkAdapter | ForEach-Object {
         if($_.Status -ne "Ok") {
@@ -49,14 +50,6 @@ Function Check-VmNetwork {
         $nagExitString += "All network adapters are okay. "
         $nagStates.Set_Item("vmNet", 0)
     }
-}
-
-if($checkMemory -eq "on") {
-    Check-VmMemory
-}
-
-if($checkNet -eq "on") {
-    Check-VmNetwork
 }
 
 # output our status message for Nagios
