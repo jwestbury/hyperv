@@ -1,10 +1,8 @@
-# todo - update script to use parameters instead of hard-coded variables
-
-﻿param(
+param(
     [Alias('f')]
     [switch]$force,
     [Alias('p')]
-    $path = "\\path\to\server",
+    [string]$path = "\\path\to\server",
     [Alias('vm')]
     $vmList
 )
@@ -16,30 +14,20 @@ if(!([System.Diagnostics.EventLog]::Exists("Scripts"))) {
 }
 
 #assign variables
-$backupDir = "\\poseidon\server";
+$backupDir = $path;
 
 write-host "Running VM backup utility";
-write-host " ";
-write-host "Included VMs: $vmList";
-write-host " ";
-write-host "`$vmList object type is ";
 
-foreach ($element in $vmList) {
-    Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2000 -Message "Backup job started for $($element)";
+#foreach ($element in $vmList) {
+    Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2000 -Message "Backup job started for $vmName";
 
     Get-Job | Remove-Job; #if there are any leftover background jobs from a previous loop or previous instance of this script, remove them, or things will get very confusing very fast
 
-    [string]$vmName = $element; #we've got to specifically cast the vmName variable as a string, or things can (read: will) break
+    [string]$vmName = $vmList[0]; #we've got to specifically cast the vmName variable as a string, or things can (read: will) break
     $vmName = Get-VM -name $vmName | Select -ExpandProperty Name; #this is kind of a dirty hack to capitalize the VM name properly for logging
     $vmObject = Get-VM -name $vmName;
 
     write-host "Current working VM: $vmName"; #our write-host commands won't ever be seen while running this as a scheduled task, but are useful for debugging and troubleshooting
-
-#    write-host "Getting VM hard drive.";
-    
-#    $vhd = Get-VMHardDiskDrive -vmName $vmName | Select -ExpandProperty Path; #grab the path of the VHD for our current VM
-
-#    write-host "Got VM hard drive.";
 
     write-host "Testing VM export path.";
     
@@ -100,13 +88,14 @@ foreach ($element in $vmList) {
     write-host "Exporting $vmName to $backupDir\$vmName . . . " -NoNewline;
     write-host "Copying . . .";
 
-    if(Export-VM -Path "$backupDir\$vmName" -VM $vmObject) { #cp exits with 0 on success, so reverse the logic
-        write-host "failed.";
-    } else {
-        Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2203 -Message "Copied $vhd to $backupDir\$vmName successfully.";
-        $a = Get-Item "$backupDir\$vmname";
-        $a.LastWriteTime = Get-Date; #copying a file doesn't change the directory's last mod/write time, so we have to do it manually
+    if(Export-VM -Path "$backupDir\$vmName" -VM $vmObject) {
+        Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2203 -Message "Exported $vmName to $backupDir\$vmName successfully.";
+        $d = Get-Item "$backupDir\$vmname";
+        $d.LastWriteTime = Get-Date; #copying a file doesn't change the directory's last mod/write time, so we have to do it manually
         write-host "copied.";
+    } else {
+        Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2213 -Message "Failed to export $vmName to $backupDir\$vmName.";
+        write-host "failed.";
     }
 
     write-host "Copied.";
@@ -132,7 +121,7 @@ foreach ($element in $vmList) {
             continue;
         }
     }
-}
+#}
 
 write-host "No further items, exiting script";
 
