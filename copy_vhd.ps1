@@ -4,7 +4,7 @@ param(
     [Alias('p')]
     [string]$path = "\\path\to\server",
     [Alias('vm')]
-    $vmList
+    [string]$vmName
 )
 
 if(!([System.Diagnostics.EventLog]::Exists("Scripts"))) {
@@ -23,7 +23,6 @@ write-host "Running VM backup utility";
 
     Get-Job | Remove-Job; #if there are any leftover background jobs from a previous loop or previous instance of this script, remove them, or things will get very confusing very fast
 
-    [string]$vmName = $vmList[0]; #we've got to specifically cast the vmName variable as a string, or things can (read: will) break
     $vmName = Get-VM -name $vmName | Select -ExpandProperty Name; #this is kind of a dirty hack to capitalize the VM name properly for logging
     $vmObject = Get-VM -name $vmName;
 
@@ -94,7 +93,7 @@ write-host "Running VM backup utility";
         $d.LastWriteTime = Get-Date; #copying a file doesn't change the directory's last mod/write time, so we have to do it manually
         write-host "copied.";
     } else {
-        Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2213 -Message "Failed to export $vmName to $backupDir\$vmName.";
+        Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2213 -Message "Failed to export $vmName to $backupDir\$vmName.";
         write-host "failed.";
     }
 

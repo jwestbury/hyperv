@@ -79,3 +79,16 @@ $ARG2$, on - specify whether or not to check dynamic memory usage, can be set
             to "off" if desired.
 $ARG3$, on - specify whether or not to check VM network adapters, can be set
             to "off" if desired.
+			
+A NOTE ON COPY_VHD.PS1 AND HYPER-V BACKUPS
+
+copy_vhd.ps1 utilizes the Export-VM cmdlet. This cmdlet executes a VM export 
+using the System account. For this reason, the computer account of the Hyper-V 
+host must have write and edit permissions to the target directory. If the 
+computer account does not have write permissions to the target directory, the 
+export will fail, and the script will log this in Event Viewer.
+
+This introduces an issue in Samba contexts, where, to my knowledge, it is not 
+possible to configure computer accounts to have write access to shared folders.
+I am not aware of a workaround to this scenario at this time. I will update if 
+I find one. Otherwise, an updated script for Samba environments is forthcoming.
