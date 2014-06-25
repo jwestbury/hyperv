@@ -3,8 +3,12 @@ param(
     [switch]$force,
     [Alias('p')]
     [string]$path = "\\path\to\server",
+#    [Alias('vm')]
+#    [string]$vmName,
     [Alias('vm')]
-    [string]$vmName
+    $vmList = (""),
+    [Alias('cp')]
+    [string]$copyPath
 )
 
 if(!([System.Diagnostics.EventLog]::Exists("Scripts"))) {
@@ -18,7 +22,7 @@ $backupDir = $path;
 
 write-host "Running VM backup utility";
 
-#foreach ($element in $vmList) {
+foreach ($vmName in $vmList) {
     Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2000 -Message "Backup job started for $vmName";
 
     Get-Job | Remove-Job; #if there are any leftover background jobs from a previous loop or previous instance of this script, remove them, or things will get very confusing very fast
@@ -33,13 +37,13 @@ write-host "Running VM backup utility";
     if(!(test-path "$backupDir\$vmName")) { #check to see if we've already got a backup directory; if not...
         write-host "$backupDir\$vmName not found, creating . . . " -NoNewline; #...we make one.
    
-        if(mkdir "$backupDir\$vmName") { #mkdir exits with 0 on success, so we reverse this logic
+        if(mkdir "$backupDir\$vmName") {
+            Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2203 -Message "Could not find $backupDir\$vnmame. Created.";
+            write-host "created!";
+        } else {
             Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2215 -Message "Could not find $backupDir\$vnmame. Failed to create.";
             write-host "failed.";
             continue; #if we can't create the directory, skip to the next VM
-        } else {
-            Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2203 -Message "Could not find $backupDir\$vnmame. Created.";
-            write-host "created!";
         }
     }
 
@@ -85,19 +89,27 @@ write-host "Running VM backup utility";
     }
    
     write-host "Exporting $vmName to $backupDir\$vmName . . . " -NoNewline;
-    write-host "Copying . . .";
 
     if(Export-VM -Path "$backupDir\$vmName" -VM $vmObject) {
         Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2203 -Message "Exported $vmName to $backupDir\$vmName successfully.";
-        $d = Get-Item "$backupDir\$vmname";
-        $d.LastWriteTime = Get-Date; #copying a file doesn't change the directory's last mod/write time, so we have to do it manually
-        write-host "copied.";
+        write-host "exported.";
     } else {
         Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2213 -Message "Failed to export $vmName to $backupDir\$vmName.";
         write-host "failed.";
     }
 
-    write-host "Copied.";
+    if($copyPath) {
+        Write-Host "Copying $backupDir\$vmName to $copyPath\$vmName . . ." -NoNewline;
+        if(Copy-Item -Path "$backupDir\$vmName" -Destination "$copyPath\$vmName" -Recurse) {
+            Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2204 -Message "Copied backup from $backupDir\$vmName to $copyPath\$vmName successfully.";
+            $d = Get-Item "$copyPath\$vmname";
+            $d.LastWriteTime = Get-Date; #copying a file doesn't change the directory's last mod/write time, so we have to do it manually
+            write-host "copied.";
+        } else {
+            Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2214 -Message "Failed to copy from $backupDir\$vmName to $copyPath\$vmName.";
+            write-host "failed.";
+        }
+    }
     
     write-host "Starting $vmName . . . " -NoNewline;
 
@@ -106,7 +118,7 @@ write-host "Running VM backup utility";
         $vmName = $args[0];
         Start-VM -Name $vmName
     }
-    Wait-Job -name start -Timeout 300; #if startping the VM takes longer than five minutes, exit the job
+    Wait-Job -name start -Timeout 300; #if starting the VM takes longer than five minutes, exit the job
     Stop-Job -name start;
 
     if((Get-VM $vmname | Select -ExpandProperty State) -eq "Running") { 
@@ -120,7 +132,7 @@ write-host "Running VM backup utility";
             continue;
         }
     }
-#}
+}
 
 write-host "No further items, exiting script";
 
