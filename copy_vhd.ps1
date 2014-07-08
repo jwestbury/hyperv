@@ -55,7 +55,7 @@ foreach ($vmName in $vmList) {
     if(($vmObject | Select -ExpandProperty State) -ne "Off" -and ($vmObject | Select -ExpandProperty State) -ne "Paused") {
         #we have to use a job to be able to time this out properly
         Start-Job -name stop -ArgumentList $vmName, $force -ScriptBlock {
-            $vmName = $args[0]; #in order to get external data into the job, we have to pass it in the form of arguments
+            $vmName = $args[0]; $force = $args[1]; #in order to get external data into the job, we have to pass it in the form of arguments
             if($force) {
                 Stop-VM -Name $vmName -Force;
             } else {
