@@ -90,25 +90,14 @@ foreach ($vmName in $vmList) {
    
     write-host "Exporting $vmName to $backupDir\$vmName . . . " -NoNewline;
 
-    if(Export-VM -Path "$backupDir\$vmName" -VM $vmObject) {
+    try {
+        Export-VM -Path "$backupDir\$vmName" -VM $vmObject -ErrorAction Stop;
         Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2203 -Message "Exported $vmName to $backupDir\$vmName successfully.";
         write-host "exported.";
-    } else {
-        Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2213 -Message "Failed to export $vmName to $backupDir\$vmName.";
-        write-host "failed.";
     }
-
-    if($copyPath) {
-        Write-Host "Copying $backupDir\$vmName to $copyPath\$vmName . . ." -NoNewline;
-        if(Copy-Item -Path "$backupDir\$vmName" -Destination "$copyPath\$vmName" -Recurse) {
-            Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2204 -Message "Copied backup from $backupDir\$vmName to $copyPath\$vmName successfully.";
-            $d = Get-Item "$copyPath\$vmname";
-            $d.LastWriteTime = Get-Date; #copying a file doesn't change the directory's last mod/write time, so we have to do it manually
-            write-host "copied.";
-        } else {
-            Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2214 -Message "Failed to copy from $backupDir\$vmName to $copyPath\$vmName.";
-            write-host "failed.";
-        }
+    catch {
+        Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2213 -Message "Failed to export $vmName to $backupDir\${$vmName}: $_";
+        write-host "failed.";
     }
     
     write-host "Starting $vmName . . . " -NoNewline;
@@ -130,6 +119,21 @@ foreach ($vmName in $vmList) {
             Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2215 -Message "$vmName failed to start: `n`n $($error[0])";
             write-host "$vmName failed to start, skipping to next VM.";
             continue;
+        }
+    }
+
+    if($copyPath) {
+        Write-Host "Copying $backupDir\$vmName to $copyPath\$vmName . . ." -NoNewline;
+        try {
+            Copy-Item -Path "$backupDir\$vmName" -Destination "$copyPath\$vmName" -Recurse;
+            Write-EventLog -LogName Scripts -Source VMBackup -EntryType Information -EventId 2204 -Message "Copied backup from $backupDir\$vmName to $copyPath\$vmName successfully.";
+            $d = Get-Item "$copyPath\$vmname";
+            $d.LastWriteTime = Get-Date; #copying a file doesn't change the directory's last mod/write time, so we have to do it manually
+            write-host "copied.";
+        }
+        catch {
+            Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2214 -Message "Failed to copy from $backupDir\$vmName to $copyPath\${$vmName}: $_";
+            write-host "failed.";
         }
     }
 }
