@@ -33,6 +33,10 @@ foreach ($vmName in $vmList) {
     write-host "Current working VM: $vmName"; #our write-host commands won't ever be seen while running this as a scheduled task, but are useful for debugging and troubleshooting
 
     write-host "Testing VM export path.";
+
+    if(test-path "$backupDir\$vmName.bak") { # remove the old backup directory if it's there
+        Remove-Item -Recurse -Path "$backupDir\$vmName.bak"
+    }
     
     if(!(test-path "$backupDir\$vmName")) { #check to see if we've already got a backup directory; if not...
         write-host "$backupDir\$vmName not found, creating . . . " -NoNewline; #...we make one.
@@ -45,6 +49,8 @@ foreach ($vmName in $vmList) {
             write-host "failed.";
             continue; #if we can't create the directory, skip to the next VM
         }
+    } else {
+        mv "$backupDir\$vmName" "$backupDir\$vmName.bak"
     }
 
     write-host "Tested VM path.";
@@ -98,6 +104,13 @@ foreach ($vmName in $vmList) {
     catch {
         Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2213 -Message "Failed to export $vmName to $backupDir\${$vmName}: $_";
         write-host "failed.";
+    }
+    
+    try {
+        Remove-Item -Recurse -Path "$backupDir\$vmName.bak"
+    }
+    catch {
+        Write-EventLog -LogName Scripts -Source VMBackup -EntryType Error -EventId 2216 -Message "Failed to delete $backupDir\$vmName.bak: $_";
     }
     
     write-host "Starting $vmName . . . " -NoNewline;
